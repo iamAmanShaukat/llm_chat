@@ -1,0 +1,241 @@
+=<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guru Granth Sahib Chatbot</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #4a148c;
+        }
+        
+        .chat-container {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        
+        .message {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            max-width: 80%;
+        }
+        
+        .user-message {
+            background-color: #e3f2fd;
+            margin-left: auto;
+            text-align: right;
+        }
+        
+        .bot-message {
+            background-color: #f9fbe7;
+        }
+        
+        .input-container {
+            display: flex;
+            gap: 10px;
+        }
+        
+        #user-input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background-color: #4a148c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #7b1fa2;
+        }
+        
+        .settings-container {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #888;
+            font-style: italic;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #666;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Guru Granth Sahib Chatbot</h1>
+        
+        <div class="chat-container" id="chat-container">
+            <div class="message bot-message">
+                Welcome! I'm a chatbot trained on the wisdom of Guru Granth Sahib. How may I assist you today?
+            </div>
+        </div>
+        
+        <div class="input-container">
+            <input type="text" id="user-input" placeholder="Ask a question about Guru Granth Sahib...">
+            <button id="send-button">Send</button>
+        </div>
+        
+        <div class="settings-container">
+            <h3>Settings</h3>
+            <label for="api-key">Gemini API Key:</label>
+            <input type="password" id="api-key" placeholder="Enter your API key">
+            <button id="save-key-button">Save Key</button>
+            <p><small>Your API key is stored in your browser's local storage and is not sent to any server other than Google's API.</small></p>
+        </div>
+    </div>
+    
+    <footer>
+        <p>This chatbot uses the Gemini API with knowledge from the Guru Granth Sahib.</p>
+        <p>Treat all responses with respect. The chatbot's interpretations should not replace scholarly guidance.</p>
+    </footer>
+    
+    <script type="module">
+        // Import the Generative AI library from CDN
+        import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatContainer = document.getElementById('chat-container');
+            const userInput = document.getElementById('user-input');
+            const sendButton = document.getElementById('send-button');
+            const apiKeyInput = document.getElementById('api-key');
+            const saveKeyButton = document.getElementById('save-key-button');
+            
+            // Load API key from local storage
+            apiKeyInput.value = localStorage.getItem('gemini-api-key') || '';
+            
+            // Save API key to local storage
+            saveKeyButton.addEventListener('click', function() {
+                localStorage.setItem('gemini-api-key', apiKeyInput.value);
+                alert('API key saved!');
+            });
+            
+            // Listen for Enter key
+            userInput.addEventListener('keyup', function(event) {
+                if (event.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+            
+            // Send button click
+            sendButton.addEventListener('click', sendMessage);
+            
+            function sendMessage() {
+                const message = userInput.value.trim();
+                if (!message) return;
+                
+                // Check for API key
+                const apiKey = localStorage.getItem('gemini-api-key');
+                if (!apiKey) {
+                    addBotMessage("Please add your Gemini API key in the settings below.");
+                    return;
+                }
+                
+                // Add user message to chat
+                addUserMessage(message);
+                userInput.value = '';
+                
+                // Add loading message
+                const loadingMsgElement = addLoadingMessage();
+                
+                // Prepare context about Guru Granth Sahib
+                const prompt = `You are a helpful assistant trained to answer questions about the Guru Granth Sahib, the central religious scripture of Sikhism. Provide responses based on the teachings and wisdom from the Guru Granth Sahib. If asked about topics outside this domain, politely redirect the conversation to Sikh teachings. Here's the user's question: ${message}`;
+                
+                // Call Gemini API
+                callGeminiAPI(prompt, apiKey)
+                    .then(response => {
+                        // Remove loading message
+                        chatContainer.removeChild(loadingMsgElement);
+                        
+                        // Add bot response
+                        addBotMessage(response);
+                    })
+                    .catch(error => {
+                        // Remove loading message
+                        chatContainer.removeChild(loadingMsgElement);
+                        
+                        // Add error message
+                        addBotMessage(`Error: ${error.message}`);
+                    });
+            }
+            
+            async function callGeminiAPI(prompt, apiKey) {
+                try {
+                    const genAI = new GoogleGenerativeAI(apiKey);
+                    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                    
+                    const result = await model.generateContent(prompt);
+                    return result.response.text();
+                } catch (error) {
+                    console.error("Error calling Gemini API:", error);
+                    throw error;
+                }
+            }
+            
+            function addUserMessage(text) {
+                const messageElement = document.createElement('div');
+                messageElement.classList.add('message', 'user-message');
+                messageElement.textContent = text;
+                chatContainer.appendChild(messageElement);
+                scrollToBottom();
+            }
+            
+            function addBotMessage(text) {
+                const messageElement = document.createElement('div');
+                messageElement.classList.add('message', 'bot-message');
+                messageElement.textContent = text;
+                chatContainer.appendChild(messageElement);
+                scrollToBottom();
+            }
+            
+            function addLoadingMessage() {
+                const loadingElement = document.createElement('div');
+                loadingElement.classList.add('message', 'bot-message', 'loading');
+                loadingElement.textContent = "Thinking...";
+                chatContainer.appendChild(loadingElement);
+                scrollToBottom();
+                return loadingElement;
+            }
+            
+            function scrollToBottom() {
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+        });
+    </script>
